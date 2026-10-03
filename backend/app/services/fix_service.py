@@ -11,7 +11,6 @@ This safe, predictable approach is by design for the hackathon demo.
 """
 
 import shutil
-from pathlib import Path
 
 from backend.app.models.findings import ScanResult
 from backend.app.services.scan_service import DEMO_APP_PATH, run_demo_scan
@@ -30,8 +29,12 @@ def apply_demo_fix() -> ScanResult:
     for filename in DEMO_FILES:
         src = FIXED_DIR / filename
         dst = DEMO_APP_PATH / filename
+        # Security: only copy files that exist in _fixed/ — never create new files
+        # or write outside DEMO_APP_PATH. DEMO_FILES is a hard-coded allowlist;
+        # no user-supplied filenames are ever used here.
         if src.exists():
             shutil.copy2(str(src), str(dst))
 
-    # Rescan and return fresh result
+    # Rescan after fix to produce the updated result.
+    # This is the same scan_directory() call used everywhere — no special paths.
     return run_demo_scan()

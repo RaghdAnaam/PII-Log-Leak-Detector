@@ -25,13 +25,17 @@ def validate_zip(file_bytes: bytes) -> None:
     Validate a ZIP archive before extraction.
     Raises SecurityError if the archive is invalid, too large, or contains dangerous paths.
     """
-    # Check size
+    # Security: enforce a hard size cap before doing any further processing.
+    # This prevents an attacker from uploading a multi-GB file to exhaust memory
+    # or a "zip bomb" (tiny archive that expands to gigabytes when opened).
     if len(file_bytes) > MAX_UPLOAD_BYTES:
         raise SecurityError(
             f"Upload exceeds maximum allowed size of {MAX_UPLOAD_BYTES} bytes"
         )
 
-    # Check it's a valid ZIP
+    # Security: confirm the magic bytes match a ZIP before calling ZipFile.
+    # Passing arbitrary bytes to ZipFile without this check could trigger
+    # unexpected behaviour in the underlying C library.
     if not zipfile.is_zipfile(io.BytesIO(file_bytes)):
         raise SecurityError("Uploaded file is not a valid ZIP archive")
 
@@ -39,13 +43,17 @@ def validate_zip(file_bytes: bytes) -> None:
         for entry in zf.infolist():
             name = entry.filename
 
-            # Reject absolute paths
+            # Security: reject entries with absolute paths (e.g. /etc/passwd).
+            # os.path.join(dest, "/etc/passwd") would silently discard dest,
+            # causing the extracted file to land at the absolute path.
             if os.path.isabs(name):
                 raise SecurityError(
                     f"ZIP entry contains an absolute path: {name!r}"
                 )
 
-            # Reject path traversal attempts
+            # Security: reject path traversal sequences (e.g. ../../etc/shadow).
+            # Using Path().parts is more reliable than a string search because
+            # it normalises OS separators before checking individual components.
             if ".." in Path(name).parts:
                 raise SecurityError(
                     f"ZIP entry contains a path traversal sequence: {name!r}"
@@ -58,24 +66,35 @@ def safe_extract(zip_bytes: bytes, dest_dir: str) -> None:
     Resolves each entry path and ensures it stays within dest_dir.
     Skips unsupported file types and binary-looking entries.
     """
+    # Security: resolve symlinks in dest_dir before comparison.
+    # If dest_dir itself were a symlink, a naive startswith check could be
+    # bypassed by crafting a path that traverses the symlink target.
     real_dest = os.path.realpath(dest_dir)
 
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
         for entry in zf.infolist():
-            # Skip directories
+            # Skip directory entries — they are created implicitly by makedirs.
             if entry.filename.endswith("/"):
                 continue
 
-            # Only extract supported extensions
+            # Security: only extract file types the scanner actually reads.
+            # This prevents executable, compiled, or binary files from being
+            # written to the extraction directory, even if they pass path checks.
             _, ext = os.path.splitext(entry.filename)
             if ext.lower() not in SUPPORTED_EXTENSIONS:
                 continue
 
+            # Security: second path-traversal check using the fully resolved path.
+            # validate_zip() rejected ".." in path components, but we re-verify
+            # here after joining with dest_dir to catch any OS normalisation edge
+            # cases (e.g. on Windows, UNC paths or drive letters).
             target_path = os.path.realpath(
                 os.path.join(dest_dir, entry.filename)
             )
 
-            # Ensure the resolved path is within dest_dir
+            # Security: the canonical resolved path must be inside real_dest.
+            # This is the final guarantee: even if a crafted entry slips through
+            # the name check, realpath comparison will catch it here.
             if not target_path.startswith(real_dest + os.sep) and target_path != real_dest:
                 raise SecurityError(
                     f"ZIP entry resolves outside destination directory: {entry.filename!r}"

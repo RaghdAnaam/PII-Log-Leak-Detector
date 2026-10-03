@@ -1,7 +1,23 @@
+"""
+Credit/debit card number detector.
+
+Supports the four most common card formats:
+- Visa / Mastercard / Discover: 16-digit grouped as 4-4-4-4 (separated or plain).
+- American Express: 15-digit grouped as 4-6-5 (separated or plain).
+
+Patterns are applied in preference order: separated formats first (higher visual
+clarity), then plain digit strings. Overlap-tracking prevents duplicate findings
+when the same number matches more than one pattern.
+
+Note: Luhn checksum validation is intentionally omitted to avoid false negatives
+from transcription errors in real log data.
+"""
+
 import re
+
 from backend.app.detectors.base import PIIDetector
-from backend.app.models.findings import Finding, PIIType, Severity
 from backend.app.masking.maskers import mask_card_number
+from backend.app.models.findings import Finding, PIIType, Severity
 
 # 4 groups of 4 digits separated by spaces or hyphens
 _CARD_SEP_RE = re.compile(
@@ -30,7 +46,25 @@ _RECOMMENDED_FIX = (
 
 
 class CreditCardDetector(PIIDetector):
+    """Detector for credit and debit card numbers.
+
+    Checks Visa, Mastercard, Discover, and Amex card formats using prefix-aware
+    patterns. Overlap-tracking ensures each card number is reported once.
+    """
+
     def detect(self, text: str, file: str = "", line_offset: int = 1) -> list[Finding]:
+        """Scan *text* for card numbers and return a Finding for each match.
+
+        Args:
+            text: A single line of source code or log output.
+            file: The file path this line belongs to (used in the Finding).
+            line_offset: The 1-based line number of *text* within the file.
+
+        Returns:
+            A list of :class:`Finding` objects, all with ``confidence="high"``
+            and ``severity=HIGH``. Returns an empty list when no card numbers
+            are detected.
+        """
         findings: list[Finding] = []
         seen_spans: list[tuple[int, int]] = []
 

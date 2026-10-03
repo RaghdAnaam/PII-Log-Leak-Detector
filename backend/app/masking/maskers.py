@@ -1,8 +1,34 @@
+"""
+PII masking functions.
+
+Each function takes a raw PII string and returns a safe, partially-redacted
+display string. Masking is:
+- **One-way** — the original value cannot be recovered from the masked form.
+- **Deterministic** — the same input always produces the same masked output.
+- **Consistent** — enough structure is preserved to confirm the PII type without
+  exposing the full value (e.g. first character of an email, date-of-birth from IC).
+
+These functions are called by detectors immediately on match. The raw value is
+stored only in the internal :class:`Finding` model and is never serialised to
+the API or printed to the CLI.
+"""
+
 import re
 
 
 def mask_email(value: str) -> str:
-    """j***@example.com — masks local part keeping only the first character."""
+    """Return a masked email address, e.g. ``john@example.com`` → ``j***@example.com``.
+
+    Preserves the first character of the local part and the full domain so the
+    address can be identified as an email without revealing the account name.
+
+    Args:
+        value: A raw email address string.
+
+    Returns:
+        A masked string such as ``j***@example.com``. Returns ``"***"`` if
+        *value* is empty or contains no ``@`` character.
+    """
     if not value or "@" not in value:
         return "***"
     local, _, domain = value.partition("@")
@@ -12,7 +38,18 @@ def mask_email(value: str) -> str:
 
 
 def mask_phone(value: str) -> str:
-    """Keep first 4 chars, mask the rest with *, keep last 2: +601*****89"""
+    """Return a masked phone number, e.g. ``+60121234567`` → ``+601*****67``.
+
+    Preserves the first 4 characters (typically country code + operator prefix)
+    and the last 2 characters, masking everything in between with ``*``.
+
+    Args:
+        value: A raw phone number string (may include spaces, dashes, parentheses).
+
+    Returns:
+        A masked string such as ``+601*****67``. Returns ``"***"`` if the digit
+        count is less than 4.
+    """
     # Strip to digits only for length check, but operate on original
     digits = re.sub(r"\D", "", value)
     if len(digits) < 4:
@@ -27,7 +64,19 @@ def mask_phone(value: str) -> str:
 
 
 def mask_ic(value: str) -> str:
-    """901231-**-**** — masks PB (state) and XXXX (sequence) parts."""
+    """Return a masked Malaysian IC number, e.g. ``901231-14-5678`` → ``901231-**-****``.
+
+    Preserves only the date-of-birth portion (``YYMMDD``). The state/country code
+    and sequence number are fully redacted, preventing re-identification while
+    confirming the approximate age of the subject.
+
+    Args:
+        value: A Malaysian IC number string, with or without hyphen separators.
+
+    Returns:
+        A masked string such as ``901231-**-****``. Falls back gracefully for
+        shorter-than-expected inputs.
+    """
     # Remove all separators to normalise
     clean = re.sub(r"[-\s]", "", value)
     if len(clean) < 12:
@@ -40,7 +89,19 @@ def mask_ic(value: str) -> str:
 
 
 def mask_card_number(value: str) -> str:
-    """4111 **** **** 1111 — shows first and last group only."""
+    """Return a masked payment card number, e.g. ``4111111111111111`` → ``4111 **** **** 1111``.
+
+    Follows the PCI-DSS convention of showing only the first 6 and last 4 digits
+    (this implementation shows the first 4 and last 4 for simplicity). Spaces are
+    used as separators regardless of the original format.
+
+    Args:
+        value: A raw card number string (digits only or grouped with spaces/hyphens).
+
+    Returns:
+        A masked string such as ``4111 **** **** 1111``. Returns
+        ``"**** **** **** ****"`` if fewer than 8 digits are present.
+    """
     digits = re.sub(r"\D", "", value)
     if len(digits) < 8:
         return "**** **** **** ****"
@@ -50,7 +111,18 @@ def mask_card_number(value: str) -> str:
 
 
 def mask_account_number(value: str) -> str:
-    """ACC-******7890 — masks all but last 4 characters of the numeric/alphanumeric part."""
+    """Return a masked account number, e.g. ``ACC-1234567890`` → ``ACC-******7890``.
+
+    Preserves an optional alphabetic prefix (e.g. ``ACC-``, ``SA``) and the last
+    4 characters of the numeric/alphanumeric portion, masking the rest with ``*``.
+
+    Args:
+        value: The account number capture (the value portion, not the keyword context).
+
+    Returns:
+        A masked string such as ``ACC-******7890``. Returns ``"***"`` for empty input.
+        For values of 4 characters or fewer, the entire value is masked.
+    """
     if not value:
         return "***"
     # Determine if there's a prefix (letters/dashes before the number)

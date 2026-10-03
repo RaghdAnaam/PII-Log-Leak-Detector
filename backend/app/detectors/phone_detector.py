@@ -1,7 +1,23 @@
+"""
+Phone number PII detector.
+
+Applies two patterns:
+1. High-confidence Malaysian numbers (+60 prefix or 01X local format).
+2. Medium-confidence generic 8–15 digit pattern for international numbers.
+
+Malaysian matches are checked first; any overlapping generic match is suppressed
+to prevent duplicate findings on the same span.
+
+Severity is elevated to HIGH when the line contains a logging keyword such as
+``logger.info`` or ``print(``, indicating the number is about to be emitted
+to a log.
+"""
+
 import re
+
 from backend.app.detectors.base import PIIDetector
-from backend.app.models.findings import Finding, PIIType, Severity
 from backend.app.masking.maskers import mask_phone
+from backend.app.models.findings import Finding, PIIType, Severity
 
 # Malaysian +60 patterns (high confidence)
 _MY_PHONE_RE = re.compile(
@@ -26,7 +42,25 @@ _RECOMMENDED_FIX = "Log a non-sensitive identifier. Never log phone numbers."
 
 
 class PhoneDetector(PIIDetector):
+    """Detector for phone numbers.
+
+    Two-pass detection: high-confidence Malaysian patterns first, then a
+    generic fallback. Overlap-tracking prevents duplicate findings.
+    """
+
     def detect(self, text: str, file: str = "", line_offset: int = 1) -> list[Finding]:
+        """Scan *text* for phone numbers and return a Finding for each match.
+
+        Args:
+            text: A single line of source code or log output.
+            file: The file path this line belongs to (used in the Finding).
+            line_offset: The 1-based line number of *text* within the file.
+
+        Returns:
+            A list of :class:`Finding` objects. Malaysian numbers are returned
+            with ``confidence="high"``; generic numbers with ``confidence="medium"``.
+            Returns an empty list when no phone numbers are detected.
+        """
         findings: list[Finding] = []
         seen_spans: list[tuple[int, int]] = []
 

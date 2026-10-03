@@ -1,7 +1,21 @@
+"""
+Malaysian IC (NRIC / MyKad) number detector.
+
+Malaysian identity card numbers follow the format ``YYMMDD-PB-XXXX`` where:
+- ``YYMMDD`` is the date of birth
+- ``PB`` is a two-digit state/country code (01–16 for Malaysian states)
+- ``XXXX`` is a four-digit sequence number
+
+Two patterns are applied:
+1. Hyphenated format ``YYMMDD-PB-XXXX`` — high confidence.
+2. Plain 12-digit format (no separators) with validated date/state fields — medium confidence.
+"""
+
 import re
+
 from backend.app.detectors.base import PIIDetector
-from backend.app.models.findings import Finding, PIIType, Severity
 from backend.app.masking.maskers import mask_ic
+from backend.app.models.findings import Finding, PIIType, Severity
 
 # Hyphenated format: YYMMDD-PB-XXXX  (state codes 01-16)
 _IC_HYPHEN_RE = re.compile(
@@ -19,7 +33,26 @@ _RECOMMENDED_FIX = (
 
 
 class ICDetector(PIIDetector):
+    """Detector for Malaysian IC (NRIC / MyKad) numbers.
+
+    Applies hyphenated pattern first (high confidence), then a plain 12-digit
+    pattern (medium confidence). Overlapping plain matches are suppressed.
+    """
+
     def detect(self, text: str, file: str = "", line_offset: int = 1) -> list[Finding]:
+        """Scan *text* for Malaysian IC numbers and return a Finding for each match.
+
+        Args:
+            text: A single line of source code or log output.
+            file: The file path this line belongs to (used in the Finding).
+            line_offset: The 1-based line number of *text* within the file.
+
+        Returns:
+            A list of :class:`Finding` objects. All IC findings carry
+            ``severity=HIGH`` regardless of confidence level, because IC numbers
+            are among the most sensitive PII in the Malaysian context.
+            Returns an empty list when no IC numbers are detected.
+        """
         findings: list[Finding] = []
         seen_spans: list[tuple[int, int]] = []
 

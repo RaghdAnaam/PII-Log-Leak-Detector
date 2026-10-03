@@ -1,0 +1,8 @@
+2024-01-15 08:00:01 INFO Application started
+2024-01-15 08:01:23 INFO Processing request id=req-001
+2024-01-15 08:02:45 INFO New user registered
+2024-01-15 08:03:12 INFO User email: john.doe@example.com
+2024-01-15 08:04:55 ERROR Request failed phone=+60 12-345 6789
+2024-01-15 08:05:01 INFO IC validation: 901231-14-5678
+2024-01-15 08:06:33 INFO Payment processed
+2024-01-15 08:07:44 INFO account: ACC-1234567890

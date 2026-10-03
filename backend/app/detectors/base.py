@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from backend.app.models.findings import Finding
 
 

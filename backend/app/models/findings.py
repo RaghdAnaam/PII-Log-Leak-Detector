@@ -1,6 +1,6 @@
 from enum import Enum
+
 from pydantic import BaseModel
-from typing import Optional
 
 
 class PIIType(str, Enum):
@@ -24,7 +24,7 @@ class Finding(BaseModel):
     masked_value: str           # Safe display value
     file: str
     line_number: int
-    column_number: Optional[int] = None
+    column_number: int | None = None
     confidence: str             # "high" | "medium" | "low"
     severity: Severity
     detection_reason: str
@@ -37,7 +37,7 @@ class FindingResponse(BaseModel):
     masked_value: str
     file: str
     line_number: int
-    column_number: Optional[int] = None
+    column_number: int | None = None
     confidence: str
     severity: Severity
     detection_reason: str

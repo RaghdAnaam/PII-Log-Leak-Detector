@@ -8,23 +8,22 @@ Commands:
 """
 
 import sys
-import os
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 # Add project root to path so we can import backend modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from backend.app.models.findings import ScanResult, Severity
 from backend.app.scanner.file_scanner import scan_directory
 from backend.app.scanner.log_scanner import scan_log_file
-from backend.app.services.fix_service import apply_demo_fix, DEMO_APP_PATH, FIXED_DIR, DEMO_FILES
-from backend.app.models.findings import Severity, ScanResult
+from backend.app.services.fix_service import DEMO_FILES, FIXED_DIR
 
 app = typer.Typer(
     name="pii-scan",
