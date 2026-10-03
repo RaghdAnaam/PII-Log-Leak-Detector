@@ -71,7 +71,7 @@ graph TD
 |---|---|
 | **Backend API** | FastAPI 0.111, Uvicorn, Pydantic v2 |
 | **Detection Engine** | Pure Python 3.11, `re` module |
-| **CLI** | Click, Rich |
+| **CLI** | Typer, Rich |
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS |
 | **Testing** | pytest, pytest-asyncio, httpx |
 | **Linting** | ruff |
@@ -82,12 +82,15 @@ graph TD
 
 ## Screenshots
 
-> See `/docs/screenshots/` after running the demo, or visit `http://localhost:3000` with the stack running.
+> Run the stack (`docker compose up --build` or locally) and visit `http://localhost:3000`.
 
-The dashboard shows:
-- Summary cards (total findings, HIGH / MEDIUM / LOW counts, files scanned)
-- A findings table with masked PII values, file path, line number, severity badge, and recommended fix
-- One-click "Fix Demo" and "Rescan" buttons
+The dashboard includes:
+- **Summary cards** — Total Findings, High Severity count, Files Scanned, Scan Status (green ✓ when clean)
+- **Findings table** — severity badge (red/yellow/blue), PII type, file path, line number, masked preview
+- **Detail panel** — click any row to see detection reason, masked value, and recommended fix
+- **"Scan Demo Project"** button — primary interaction, triggers the full scan in one click
+- **"Apply Demo Fix"** button — applies clean replacements, auto-rescans, shows 0-findings clean state
+- **Severity filter** — filter findings by ALL / HIGH / MEDIUM / LOW
 
 ---
 
@@ -98,44 +101,53 @@ The dashboard shows:
 ```
 $ pii-scan scan ./demo_vulnerable_app
 
-🔍 Scanning: ./demo_vulnerable_app
-   Files scanned : 4
-   Findings      : 11
+╭──────────────────────────────────────────────────────────────────────────────╮
+│  PII Log Leak Detector                                                       │
+│  Scanning: ./demo_vulnerable_app                                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-Findings
-────────────────────────────────────────────────────────────────────────────────
- #   File                      Line  Type            Severity  Masked Value
-────────────────────────────────────────────────────────────────────────────────
- 1   customer_service.py         14  Email           HIGH      j***@example.com
- 2   customer_service.py         27  Phone           HIGH      +601*****89
- 3   customer_service.py         41  Malaysian IC    HIGH      901231-**-****
- 4   payments.py                  9  Credit Card     HIGH      4111 **** **** 1111
- 5   payments.py                 22  Account Number  MEDIUM    ACC-******7890
- 6   errors.py                    8  Email           HIGH      s***@corp.com
- ...
+                                    Findings
+┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Severity ┃ PII Type       ┃ File                     ┃ Line ┃ Preview              ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ HIGH     │ Credit Card    │ payments.py              │   24 │ 4111 **** **** 1111  │
+│ HIGH     │ Email          │ customer_service.py      │   34 │ j***@example.com     │
+│ HIGH     │ Malaysian IC   │ customer_service.py      │   36 │ 901231-**-****       │
+│ HIGH     │ Malaysian IC   │ utils.py                 │   39 │ 901231-**-****       │
+│ HIGH     │ Email          │ utils.py                 │   45 │ j***@testmail.com    │
+│ MEDIUM   │ Account Number │ payments.py              │   43 │ ******7890           │
+│ MEDIUM   │ Phone          │ customer_service.py      │   35 │ +60 *********89      │
+│ MEDIUM   │ Phone          │ errors.py                │   29 │ +60 **********55     │
+│ ...      │ ...            │ ...                      │  ... │ ...                  │
+└──────────┴────────────────┴──────────────────────────┴──────┴──────────────────────┘
 
-Summary: 9 HIGH  ·  2 MEDIUM  ·  0 LOW
+16 potential PII leaks detected in 4 files.
+
+Run pii-scan fix ./demo_vulnerable_app to review recommended fixes.
 ```
 
 ### Scan a log file
 
 ```
-$ pii-scan scan-log ./demo_logs/app.log
+$ pii-scan scan-log ./demo_logs/application.log
 
-🔍 Scanning log: ./demo_logs/app.log
-   Lines scanned : 120
-   Findings      : 7
+╭──────────────────────────────────────────────────────────────────────────────╮
+│  PII Log Leak Detector                                                       │
+│  Scanning log: ./demo_logs/application.log                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-Findings
-────────────────────────────────────────────────────────────────────────────────
- #   Line   Type            Severity  Masked Value          Detection Reason
-────────────────────────────────────────────────────────────────────────────────
- 1    18    Email           HIGH      a***@bank.com.my      Found in application log file
- 2    34    Phone           HIGH      +601*****23           Found in application log file
- 3    51    Credit Card     HIGH      5412 **** **** 3456   Found in application log file
- ...
+                                    Findings
+┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Severity ┃ PII Type       ┃ File                     ┃ Line ┃ Preview              ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ HIGH     │ Email          │ application.log          │    8 │ j***@example.com     │
+│ HIGH     │ Malaysian IC   │ application.log          │   18 │ 901231-**-****       │
+│ MEDIUM   │ Phone          │ application.log          │   12 │ +60 *********89      │
+│ MEDIUM   │ Account Number │ application.log          │   24 │ ******7890           │
+│ ...      │ ...            │ ...                      │  ... │ ...                  │
+└──────────┴────────────────┴──────────────────────────┴──────┴──────────────────────┘
 
-Summary: 6 HIGH  ·  1 MEDIUM  ·  0 LOW
+Findings detected in log file.
 ```
 
 ### Apply the demo fix and rescan
@@ -143,17 +155,34 @@ Summary: 6 HIGH  ·  1 MEDIUM  ·  0 LOW
 ```
 $ pii-scan fix ./demo_vulnerable_app
 
-🔧 Applying demo fix...
-   Replaced: customer_service.py
-   Replaced: payments.py
-   Replaced: errors.py
-   Replaced: utils.py
+╭──────────────────────────────────────────────────────────────────────────────╮
+│  PII Log Leak Detector — Fix Mode                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-🔍 Rescanning after fix...
-   Files scanned : 4
-   Findings      : 0
+Current scan: 16 findings in 4 files.
 
-✅ Clean — no PII found after fix.
+The following files will be updated with safe logging patterns:
+  • customer_service.py  (4 findings)
+  • errors.py  (1 finding)
+  • payments.py  (8 findings)
+  • utils.py  (3 findings)
+
+Apply demo fixes? [y/N]: y
+Applying fixes...
+
+  ✓ customer_service.py updated
+  ✓ payments.py updated
+  ✓ errors.py updated
+  ✓ utils.py updated
+
+Re-scanning...
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│  ✓ No potential PII leaks detected.                                          │
+│    Files scanned: 4                                                          │
+│    Potential leaks: 0                                                        │
+│    Scan completed successfully.                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ---
@@ -212,7 +241,7 @@ curl http://localhost:8000/health
 
 ```bash
 pii-scan scan ./demo_vulnerable_app
-pii-scan scan-log ./demo_logs/app.log
+pii-scan scan-log ./demo_logs/application.log
 pii-scan fix ./demo_vulnerable_app
 ```
 
@@ -224,12 +253,25 @@ pii-scan fix ./demo_vulnerable_app
 docker compose up --build
 ```
 
+Both images build successfully (verified):
+- **Backend** — `python:3.11-slim`, installs deps, runs uvicorn
+- **Frontend** — multi-stage: `node:20-alpine` builds the Vite bundle, `nginx:alpine` serves it with SPA routing and API proxy
+
 | Service | URL |
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
 | API Docs (Swagger) | http://localhost:8000/docs |
 | Health check | http://localhost:8000/health |
+
+```bash
+# Quick smoke-test after startup
+curl http://localhost:8000/health
+# {"status":"ok","service":"PII Log Leak Detector"}
+
+curl -s -X POST http://localhost:8000/api/scan/demo | python3 -m json.tool | grep total_findings
+# "total_findings": 16,
+```
 
 To stop: `docker compose down`
 
@@ -245,48 +287,63 @@ source .venv/bin/activate
 pytest backend/tests/ -v
 ```
 
-Expected output format:
+Verified output (69 tests, 0 failures):
 
 ```
-backend/tests/test_detectors.py::test_email_detector_finds_email PASSED
-backend/tests/test_detectors.py::test_phone_detector_finds_malaysian PASSED
-backend/tests/test_detectors.py::test_ic_detector_finds_hyphenated PASSED
-backend/tests/test_detectors.py::test_credit_card_detector_finds_visa PASSED
+backend/tests/test_detectors.py::test_email_detector[john.doe@example.com-1] PASSED
+backend/tests/test_detectors.py::test_phone_detector[+60 12-345 6789-1-1] PASSED
+backend/tests/test_detectors.py::test_ic_detector[IC: 901231-14-5678-1] PASSED
+backend/tests/test_detectors.py::test_credit_card_detector[Card: 4111 1111 1111 1111-1] PASSED
+backend/tests/test_detectors.py::test_account_number_detector[account: ACC-1234567890-1] PASSED
 backend/tests/test_maskers.py::test_mask_email PASSED
 backend/tests/test_maskers.py::test_mask_phone PASSED
 backend/tests/test_maskers.py::test_mask_ic PASSED
-backend/tests/test_file_scanner.py::test_scan_file_finds_pii PASSED
-backend/tests/test_log_scanner.py::test_scan_log_file PASSED
-backend/tests/test_api.py::test_scan_demo_returns_findings PASSED
-backend/tests/test_api.py::test_matched_value_absent_from_response PASSED
-backend/tests/test_security.py::test_validate_zip_rejects_path_traversal PASSED
+backend/tests/test_maskers.py::test_mask_card_number PASSED
+backend/tests/test_maskers.py::test_mask_account_number PASSED
+backend/tests/test_file_scanner.py::test_scan_clean_file_zero_findings PASSED
+backend/tests/test_file_scanner.py::test_scan_directory_ignores_pycache PASSED
+backend/tests/test_file_scanner.py::test_scan_directory_ignores_fixed_dir PASSED
+backend/tests/test_file_scanner.py::test_scan_directory_skips_binary_files PASSED
+backend/tests/test_api.py::test_demo_scan_returns_findings PASSED
+backend/tests/test_api.py::test_demo_scan_matched_value_absent PASSED
+backend/tests/test_api.py::test_fix_and_rescan PASSED
+backend/tests/test_api.py::test_security_headers PASSED
+backend/tests/test_security.py::test_path_traversal_rejected PASSED
+backend/tests/test_security.py::test_oversized_zip_rejected PASSED
+backend/tests/test_security.py::test_absolute_path_rejected PASSED
 ...
 
-========================= XX passed in X.XXs =========================
+========================= 69 passed in 0.12s =========================
 ```
 
 ---
 
 ## Example Detection Results
 
-The demo vulnerable app contains these deliberate PII leaks:
+The demo vulnerable app produces **16 findings across 4 files** (verified):
 
 ```
-customer_service.py:14  →  Email        j***@example.com       [HIGH]   near logger.info
-customer_service.py:27  →  Phone        +601*****89            [HIGH]   near logger.info
-customer_service.py:41  →  Malaysian IC 901231-**-****         [HIGH]   near logger.debug
-payments.py:9           →  Credit Card  4111 **** **** 1111    [HIGH]   near print(
-payments.py:22          →  Account No.  ACC-******7890         [MEDIUM] contextual match
-errors.py:8             →  Email        s***@corp.com.my       [HIGH]   near raise
-utils.py:15             →  Phone        +601*****34            [HIGH]   near logger.warning
+payments.py:24          →  Credit Card     4111 **** **** 1111   [HIGH]   near logger.info
+customer_service.py:34  →  Email           j***@example.com      [HIGH]   near logger.info
+customer_service.py:36  →  Malaysian IC    901231-**-****        [HIGH]   near logger.info
+utils.py:39             →  Malaysian IC    901231-**-****        [HIGH]   near print(
+utils.py:45             →  Email           j***@testmail.com     [HIGH]   near print(
+customer_service.py:35  →  Phone           +60 *********89      [MEDIUM] near logger.info
+errors.py:29            →  Phone           +60 **********55     [MEDIUM] near logger.error
+payments.py:43          →  Account Number  ******7890           [MEDIUM] contextual match
+... (8 more MEDIUM account/phone findings)
 ```
 
-After running `pii-scan fix ./demo_vulnerable_app` (or clicking "Fix Demo"), the next scan returns:
+**Summary: 5 HIGH · 11 MEDIUM · 0 LOW**
+
+After running `pii-scan fix ./demo_vulnerable_app` (or clicking "Apply Demo Fix"), the next scan returns:
 
 ```
-Files scanned: 4   Findings: 0
-
-✅ No PII found.
+╭──────────────────────────────────────────────────────────╮
+│  ✓ No potential PII leaks detected.                      │
+│    Files scanned: 4   ·   Potential leaks: 0             │
+│    Scan completed successfully.                          │
+╰──────────────────────────────────────────────────────────╯
 ```
 
 ---
