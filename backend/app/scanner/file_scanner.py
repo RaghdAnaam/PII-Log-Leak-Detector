@@ -127,6 +127,11 @@ def scan_directory(path: str) -> ScanResult:
     all_findings: list[Finding] = []
     files_scanned = 0
 
+    # Resolve the scan root once so we can strip it from every filepath,
+    # giving findings a clean relative path (e.g. "payments.py" instead of
+    # "/Users/.../demo_vulnerable_app/payments.py").
+    abs_root = os.path.realpath(path) + os.sep
+
     try:
         for dirpath, dirnames, filenames in os.walk(path):
             # Prune ignored directories in-place so os.walk won't descend into them
@@ -139,6 +144,18 @@ def scan_directory(path: str) -> ScanResult:
 
                 filepath = os.path.join(dirpath, filename)
                 findings = scan_file(filepath)
+
+                # Replace the absolute path stored in each finding with a path
+                # relative to the scan root — cleaner for display in CLI and UI.
+                abs_filepath = os.path.realpath(filepath)
+                display_path = (
+                    abs_filepath[len(abs_root):]
+                    if abs_filepath.startswith(abs_root)
+                    else filepath
+                )
+                for finding in findings:
+                    finding.file = display_path
+
                 all_findings.extend(findings)
                 files_scanned += 1
 
