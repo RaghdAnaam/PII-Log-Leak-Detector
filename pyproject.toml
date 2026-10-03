@@ -21,7 +21,10 @@ pii-scan = "cli.pii_scan_cli:app"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["backend*", "cli*"]
 
 [tool.ruff]
 line-length = 100
