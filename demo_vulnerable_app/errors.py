@@ -34,7 +34,7 @@ def handle_customer_request(customer_id: str = "CUST-002") -> dict:
         response = _call_external_api(request_payload)
         logger.info("Request succeeded customer_id=%s", customer_id)
         return response
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # VULNERABILITY E: request_payload contains sensitive phone number
         logger.error(f"Request failed for customer: {request_payload}")
         return {"status": "error", "message": str(e)}

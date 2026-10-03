@@ -32,7 +32,7 @@ def handle_customer_request(customer_id: str = "CUST-002") -> dict:
         response = _call_external_api(request_payload)
         logger.info("Request succeeded customer_id=%s", customer_id)
         return response
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # FIX E: log only the customer_id and the error class, not the raw payload
         logger.error("Request failed customer_id=%s error=%s", customer_id, type(e).__name__)
         return {"status": "error", "message": str(e)}
