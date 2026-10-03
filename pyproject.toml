@@ -1,0 +1,31 @@
+[project]
+name = "pii-log-leak-detector"
+version = "0.1.0"
+description = "A security developer tool that detects PII accidentally exposed in application source code and log files."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "typer[all]",
+    "rich",
+    "httpx",
+    "pytest",
+    "pytest-cov",
+    "python-multipart",
+    "ruff",
+]
+
+[project.scripts]
+pii-scan = "cli.pii_scan_cli:app"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
